@@ -1,0 +1,17 @@
+# Katta fayllar - GitHub ga kerak emas
+*.exe
+*.msi
+*.pkg
+dist/
+build/
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+logs/
+nova_mobile/__pycache__/
+nova_mobile/.buildozer/
+nova_mobile/bin/
+*.spec
+!NovaLauncher.spec
+!NovaLauncherSetup.spec
