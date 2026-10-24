@@ -1,0 +1,126 @@
+name: Build Nova Launcher APK
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-22.04
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+
+    - name: Set up Java 17
+      uses: actions/setup-java@v3
+      with:
+        distribution: 'temurin'
+        java-version: '17'
+
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          git \
+          zip \
+          unzip \
+          openjdk-17-jdk \
+          libffi-dev \
+          libssl-dev \
+          zlib1g-dev \
+          libncurses5 \
+          libstdc++6 \
+          cmake \
+          build-essential \
+          autoconf \
+          libtool \
+          pkg-config \
+          libltdl-dev \
+          python3-pip \
+          ccache
+
+    - name: Install buildozer and cython
+      run: |
+        pip install --upgrade pip
+        pip install buildozer
+        pip install cython==0.29.33
+        pip install kivy
+
+    - name: Cache buildozer global dir
+      uses: actions/cache@v3
+      with:
+        path: ~/.buildozer
+        key: buildozer-${{ hashFiles('nova_mobile/buildozer.spec') }}
+        restore-keys: buildozer-
+
+    - name: Write buildozer.spec
+      run: |
+        cat > nova_mobile/buildozer.spec << 'EOF'
+        [app]
+        title = Nova Launcher
+        package.name = novalauncher
+        package.domain = com.nova.launcher
+        source.dir = .
+        source.include_exts = py,png,jpg,kv,atlas,json
+        source.include_patterns = assets/*
+        version = 2.5.0
+        requirements = python3,kivy
+        icon.filename = %(source.dir)s/assets/logo.png
+        orientation = portrait
+        fullscreen = 0
+        android.api = 33
+        android.minapi = 21
+        android.archs = arm64-v8a, armeabi-v7a
+        android.allow_backup = True
+        android.permissions = android.permission.INTERNET,android.permission.WRITE_EXTERNAL_STORAGE
+        
+        [buildozer]
+        log_level = 2
+        warn_on_root = 1
+        EOF
+
+    - name: Build APK
+      working-directory: nova_mobile
+      run: |
+        export JAVA_HOME=$JAVA_HOME_17_X64
+        buildozer -v android debug
+
+    - name: Find APK
+      run: |
+        echo "=== APK fayllari ==="
+        find nova_mobile/bin -name "*.apk" 2>/dev/null || echo "APK topilmadi"
+        ls -la nova_mobile/bin/ 2>/dev/null || echo "bin papkasi yo'q"
+
+    - name: Upload APK as artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: NovaLauncher-APK
+        path: nova_mobile/bin/*.apk
+        if-no-files-found: error
+
+    - name: Create Release
+      if: github.ref == 'refs/heads/main'
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: v2.5.0-${{ github.run_number }}
+        name: Nova Launcher v2.5.0 (Build ${{ github.run_number }})
+        body: |
+          ## 🎮 Nova Launcher APK
+          
+          Java Minecraft mobil launcher
+          
+          **O'rnatish:**
+          1. APK ni yuklab oling
+          2. Sozlamalar → Xavfsizlik → Noma'lum manbalar → yoqing
+          3. APK ni ochib o'rnating
+        files: nova_mobile/bin/*.apk
+        draft: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
